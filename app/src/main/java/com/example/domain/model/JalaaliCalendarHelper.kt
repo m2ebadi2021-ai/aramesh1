@@ -237,7 +237,15 @@ object JalaaliCalendarHelper {
     }
 
     fun toPersianNumber(number: Int): String {
-        return number.toString().map { c ->
+        return toPersianNumber(number.toString())
+    }
+
+    fun toPersianNumber(number: Long): String {
+        return toPersianNumber(number.toString())
+    }
+
+    fun toPersianNumber(text: String): String {
+        return text.map { c ->
             when (c) {
                 '0' -> '۰'
                 '1' -> '۱'

@@ -27,6 +27,7 @@ import com.example.data.repository.ArameshRepository
 import com.example.domain.model.BadgeCatalog
 import com.example.domain.model.BadgeDefinition
 import com.example.domain.model.GratitudeTreeState
+import com.example.domain.model.ServerMediaItem
 import com.example.ui.theme.AppThemeSetting
 import com.example.worker.DailyHabitReminderWorker
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,6 +37,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 class ArameshViewModel(application: Application) : AndroidViewModel(application) {
@@ -345,8 +348,180 @@ class ArameshViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    // --- SERVER MEDIA & NOTIFICATIONS ---
+    val allServerMedia: StateFlow<List<ServerMediaItem>> = repository.allServerMedia
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val serverAudios: StateFlow<List<ServerMediaItem>> = repository.serverAudios
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val serverImages: StateFlow<List<ServerMediaItem>> = repository.serverImages
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val serverVideos: StateFlow<List<ServerMediaItem>> = repository.serverVideos
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val serverNotifications: StateFlow<List<ServerMediaItem>> = repository.serverNotifications
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val unreadNotificationCount: StateFlow<Int> = repository.unreadNotificationCount
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    private val _isMediaSyncing = MutableStateFlow(false)
+    val isMediaSyncing: StateFlow<Boolean> = _isMediaSyncing.asStateFlow()
+
+    private val _mediaSyncError = MutableStateFlow<String?>(null)
+    val mediaSyncError: StateFlow<String?> = _mediaSyncError.asStateFlow()
+
+    fun clearMediaSyncError() {
+        _mediaSyncError.value = null
+    }
+
+    fun refreshServerMedia(type: String? = null) {
+        viewModelScope.launch {
+            _isMediaSyncing.value = true
+            _mediaSyncError.value = null
+            val result = repository.syncServerMedia(type)
+            result.onFailure { error ->
+                _mediaSyncError.value = error.localizedMessage ?: "خطا در اتصال به سرور"
+            }
+            _isMediaSyncing.value = false
+        }
+    }
+
+    fun markNotificationAsRead(id: Long) {
+        viewModelScope.launch {
+            repository.markMediaAsRead(id)
+        }
+    }
+
+    // --- ONLINE AUDIO STREAMING PLAYER ---
+    private var onlineMediaPlayer: android.media.MediaPlayer? = null
+    private var onlineAudioJob: kotlinx.coroutines.Job? = null
+
+    private val _currentPlayingOnlineAudio = MutableStateFlow<ServerMediaItem?>(null)
+    val currentPlayingOnlineAudio: StateFlow<ServerMediaItem?> = _currentPlayingOnlineAudio.asStateFlow()
+
+    private val _isOnlineAudioPlaying = MutableStateFlow(false)
+    val isOnlineAudioPlaying: StateFlow<Boolean> = _isOnlineAudioPlaying.asStateFlow()
+
+    private val _onlineAudioProgressSeconds = MutableStateFlow(0)
+    val onlineAudioProgressSeconds: StateFlow<Int> = _onlineAudioProgressSeconds.asStateFlow()
+
+    private val _onlineAudioDurationSeconds = MutableStateFlow(0)
+    val onlineAudioDurationSeconds: StateFlow<Int> = _onlineAudioDurationSeconds.asStateFlow()
+
+    fun playOnlineAudio(item: ServerMediaItem) {
+        val url = item.fullMediaUrl
+        if (url.isNullOrBlank()) return
+
+        // If clicking same audio that is currently active, toggle pause/resume
+        if (_currentPlayingOnlineAudio.value?.id == item.id && onlineMediaPlayer != null) {
+            if (_isOnlineAudioPlaying.value) {
+                pauseOnlineAudio()
+            } else {
+                resumeOnlineAudio()
+            }
+            return
+        }
+
+        stopOnlineAudio()
+        _currentPlayingOnlineAudio.value = item
+        _isOnlineAudioPlaying.value = false
+        _onlineAudioProgressSeconds.value = 0
+        _onlineAudioDurationSeconds.value = item.durationSeconds
+
+        try {
+            val player = android.media.MediaPlayer().apply {
+                setDataSource(url)
+                setOnPreparedListener { mp ->
+                    mp.start()
+                    _isOnlineAudioPlaying.value = true
+                    val durSec = mp.duration / 1000
+                    if (durSec > 0) {
+                        _onlineAudioDurationSeconds.value = durSec
+                    }
+                    startOnlineAudioProgressTracker()
+                }
+                setOnCompletionListener {
+                    _isOnlineAudioPlaying.value = false
+                    _onlineAudioProgressSeconds.value = 0
+                }
+                setOnErrorListener { _, _, _ ->
+                    _isOnlineAudioPlaying.value = false
+                    _mediaSyncError.value = "خطا در پخش آوای آنلاین"
+                    true
+                }
+                prepareAsync()
+            }
+            onlineMediaPlayer = player
+        } catch (e: Exception) {
+            _mediaSyncError.value = "امکان پخش آنلاین این فایل وجود ندارد"
+        }
+    }
+
+    fun pauseOnlineAudio() {
+        onlineMediaPlayer?.let {
+            if (it.isPlaying) {
+                it.pause()
+                _isOnlineAudioPlaying.value = false
+            }
+        }
+    }
+
+    fun resumeOnlineAudio() {
+        onlineMediaPlayer?.let {
+            it.start()
+            _isOnlineAudioPlaying.value = true
+            startOnlineAudioProgressTracker()
+        }
+    }
+
+    fun seekOnlineAudio(seconds: Int) {
+        onlineMediaPlayer?.let {
+            val targetMs = (seconds * 1000).coerceIn(0, it.duration)
+            it.seekTo(targetMs)
+            _onlineAudioProgressSeconds.value = seconds
+        }
+    }
+
+    fun stopOnlineAudio() {
+        onlineAudioJob?.cancel()
+        onlineAudioJob = null
+        try {
+            onlineMediaPlayer?.stop()
+            onlineMediaPlayer?.release()
+        } catch (e: Exception) {
+            // ignore
+        }
+        onlineMediaPlayer = null
+        _isOnlineAudioPlaying.value = false
+        _currentPlayingOnlineAudio.value = null
+        _onlineAudioProgressSeconds.value = 0
+    }
+
+    private fun startOnlineAudioProgressTracker() {
+        onlineAudioJob?.cancel()
+        onlineAudioJob = viewModelScope.launch {
+            while (isActive) {
+                onlineMediaPlayer?.let { mp ->
+                    if (mp.isPlaying) {
+                        _onlineAudioProgressSeconds.value = (mp.currentPosition / 1000)
+                    }
+                }
+                delay(500)
+            }
+        }
+    }
+
+    init {
+        // Initial automatic sync from server
+        refreshServerMedia()
+    }
+
     override fun onCleared() {
         super.onCleared()
         audioEngine.stopAll()
+        stopOnlineAudio()
     }
 }

@@ -29,11 +29,13 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.VolumeUp
+import coil.compose.AsyncImage
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -186,6 +188,11 @@ fun MeditationScreen(
 
     val activeSound by viewModel.audioEngine.activeSoundType.collectAsState()
     val isSoundPlaying by viewModel.audioEngine.isPlaying.collectAsState()
+
+    val serverAudios by viewModel.serverAudios.collectAsState()
+    val currentOnlineAudio by viewModel.currentPlayingOnlineAudio.collectAsState()
+    val isOnlinePlaying by viewModel.isOnlineAudioPlaying.collectAsState()
+    val onlineProgress by viewModel.onlineAudioProgressSeconds.collectAsState()
 
     var selectedPractice by remember { mutableStateOf(MeditationPractice.MINDFULNESS) }
     var selectedMinutes by remember { mutableIntStateOf(selectedPractice.defaultMinutes) }
@@ -686,6 +693,153 @@ fun MeditationScreen(
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text("فایل دلخواه 📁", fontFamily = VazirFont, fontSize = 11.sp)
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 6. Online Audio Meditations from User Server
+            if (serverAudios.isNotEmpty()) {
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Column {
+                        Text(
+                            text = "مراقبه‌های صوتی آنلاین سرور ☁️🎧",
+                            fontFamily = LalezarFont,
+                            fontSize = 18.sp,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Text(
+                            text = "جلسات صوتی با کیفیت بالا از سرور اختصاصی طراوت",
+                            fontFamily = VazirFont,
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                items(serverAudios) { audio ->
+                    val isThisPlaying = currentOnlineAudio?.id == audio.id && isOnlinePlaying
+                    ElevatedCard(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.elevatedCardColors(
+                            containerColor = if (isThisPlaying) TealPrimary.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surface
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (!audio.fullImageUrl.isNullOrBlank()) {
+                                    AsyncImage(
+                                        model = audio.fullImageUrl,
+                                        contentDescription = audio.title,
+                                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                        modifier = Modifier
+                                            .size(52.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                    )
+                                } else {
+                                    Surface(
+                                        color = TealPrimary.copy(alpha = 0.15f),
+                                        shape = RoundedCornerShape(12.dp),
+                                        modifier = Modifier.size(52.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Text(text = "🧘", fontSize = 24.sp)
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.width(12.dp))
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = audio.title,
+                                        fontFamily = LalezarFont,
+                                        fontSize = 16.sp,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1
+                                    )
+                                    if (audio.description.isNotBlank()) {
+                                        Text(
+                                            text = audio.description,
+                                            fontFamily = VazirFont,
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        if (audio.category.isNotBlank()) {
+                                            Surface(
+                                                color = TealSecondary.copy(alpha = 0.15f),
+                                                shape = CircleShape
+                                            ) {
+                                                Text(
+                                                    text = audio.category,
+                                                    fontFamily = VazirFont,
+                                                    fontSize = 10.sp,
+                                                    color = TealSecondary,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                        }
+                                        if (audio.durationSeconds > 0) {
+                                            Text(
+                                                text = "⏱️ ${audio.formattedDuration}",
+                                                fontFamily = VazirFont,
+                                                fontSize = 11.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+
+                                IconButton(
+                                    onClick = {
+                                        if (isThisPlaying) {
+                                            viewModel.pauseOnlineAudio()
+                                        } else {
+                                            viewModel.playOnlineAudio(audio)
+                                        }
+                                    }
+                                ) {
+                                    Surface(
+                                        color = if (isThisPlaying) Color(0xFFE53935) else TealPrimary,
+                                        shape = CircleShape,
+                                        modifier = Modifier.size(40.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = if (isThisPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                                contentDescription = null,
+                                                tint = Color.White,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (currentOnlineAudio?.id == audio.id && audio.durationSeconds > 0) {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                val progressRatio = (onlineProgress.toFloat() / audio.durationSeconds.toFloat()).coerceIn(0f, 1f)
+                                androidx.compose.material3.LinearProgressIndicator(
+                                    progress = { progressRatio },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(4.dp)
+                                        .clip(RoundedCornerShape(2.dp)),
+                                    color = TealPrimary
+                                )
                             }
                         }
                     }

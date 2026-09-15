@@ -20,6 +20,7 @@ import com.example.data.local.entity.MindfulnessEntity
 import com.example.data.local.entity.SelfKnowItemEntity
 import com.example.data.local.entity.SelfKnowQuestionEntity
 import com.example.data.local.entity.SelfLoveEntity
+import com.example.data.local.entity.ServerMediaEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -173,4 +174,26 @@ interface ArameshDao {
 
     @Query("SELECT * FROM badges WHERE `key` = :key LIMIT 1")
     suspend fun getBadgeByKey(key: String): BadgeEntity?
+
+    // --- SERVER MEDIA & NOTIFICATIONS ---
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertServerMediaItems(items: List<ServerMediaEntity>)
+
+    @Query("SELECT * FROM server_media ORDER BY sortOrder ASC, id ASC")
+    fun getAllServerMedia(): Flow<List<ServerMediaEntity>>
+
+    @Query("SELECT * FROM server_media WHERE type = :type ORDER BY sortOrder ASC, id ASC")
+    fun getServerMediaByType(type: String): Flow<List<ServerMediaEntity>>
+
+    @Query("DELETE FROM server_media WHERE type = :type")
+    suspend fun deleteServerMediaByType(type: String)
+
+    @Query("DELETE FROM server_media")
+    suspend fun clearAllServerMedia()
+
+    @Query("UPDATE server_media SET isRead = 1 WHERE id = :id")
+    suspend fun markMediaAsRead(id: Long)
+
+    @Query("SELECT COUNT(*) FROM server_media WHERE type = 'notification' AND isRead = 0")
+    fun getUnreadNotificationCount(): Flow<Int>
 }

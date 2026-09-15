@@ -143,3 +143,22 @@ data class BadgeEntity(
     val key: String,
     val unlockedAt: String // ISO or YYYY-MM-DD timestamp
 )
+
+@Entity(tableName = "server_media")
+data class ServerMediaEntity(
+    @PrimaryKey
+    val id: Long,
+    val title: String,
+    val description: String?,
+    val url: String?,
+    val image: String?,
+    val duration: Int = 0,
+    val category: String?,
+    val type: String, // "audio", "image", "video", "notification"
+    val sortOrder: Int = 0,
+    val updatedAt: String?,
+    val fullMediaUrl: String?,
+    val fullImageUrl: String?,
+    val isRead: Boolean = false
+)
+

@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Park
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.SelfImprovement
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Badge
@@ -55,6 +56,7 @@ import com.example.ui.screens.GratitudeScreen
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.MeditationScreen
 import com.example.ui.screens.PersonalGrowthScreen
+import com.example.ui.screens.ServerMediaScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.SplashScreen
 import com.example.ui.theme.ArameshTheme
@@ -76,6 +78,7 @@ sealed class Screen(val route: String, val titleFa: String, val icon: ImageVecto
     object Analytics : Screen("analytics", "تقویم و آمار", Icons.Default.CalendarMonth)
     object Badges : Screen("badges", "نشان‌ها", Icons.Default.EmojiEvents)
     object Settings : Screen("settings", "تنظیمات", Icons.Default.Settings)
+    object ServerMedia : Screen("server_media", "رسانه و اعلان‌ها", Icons.Default.Notifications)
 }
 
 val bottomNavItems = listOf(
@@ -94,6 +97,7 @@ fun ArameshApp(
     val themeSetting by viewModel.themeSetting.collectAsState()
     val celebrationBadge by viewModel.celebrationBadge.collectAsState()
     val unlockedBadges by viewModel.unlockedBadges.collectAsState()
+    val unreadNotifications by viewModel.unreadNotificationCount.collectAsState()
 
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -143,6 +147,29 @@ fun ArameshApp(
                                 }
                             },
                             actions = {
+                                // Server Media / Announcements Bell
+                                IconButton(onClick = { navController.navigate(Screen.ServerMedia.route) }) {
+                                    BadgedBox(
+                                        badge = {
+                                            if (unreadNotifications > 0) {
+                                                Badge(containerColor = MaterialTheme.colorScheme.error) {
+                                                    Text(
+                                                        text = JalaaliCalendarHelper.toPersianNumber(unreadNotifications),
+                                                        fontFamily = VazirFont,
+                                                        fontSize = 10.sp,
+                                                        color = Color.White
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Notifications,
+                                            contentDescription = "رسانه و اعلان‌ها",
+                                            tint = if (currentRoute == Screen.ServerMedia.route) TealPrimary else MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                }
                                 // Calendar action
                                 IconButton(onClick = { navController.navigate(Screen.Analytics.route) }) {
                                     Icon(
@@ -250,7 +277,8 @@ fun ArameshApp(
                                     },
                                     onNavigateToCalendar = { navController.navigate(Screen.Analytics.route) },
                                     onNavigateToBadges = { navController.navigate(Screen.Badges.route) },
-                                    onNavigateToSettings = { navController.navigate(Screen.Settings.route) }
+                                    onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
+                                    onNavigateToServerMedia = { navController.navigate(Screen.ServerMedia.route) }
                                 )
                             }
                             composable(Screen.Gratitude.route) {
@@ -276,6 +304,9 @@ fun ArameshApp(
                             }
                             composable(Screen.Settings.route) {
                                 SettingsScreen(viewModel = viewModel)
+                            }
+                            composable(Screen.ServerMedia.route) {
+                                ServerMediaScreen(viewModel = viewModel)
                             }
                         }
                     }

@@ -98,6 +98,7 @@ fun HomeScreen(
     onNavigateToCalendar: () -> Unit,
     onNavigateToBadges: () -> Unit,
     onNavigateToSettings: () -> Unit,
+    onNavigateToServerMedia: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val treeState by viewModel.gratitudeTreeState.collectAsState()
@@ -105,6 +106,12 @@ fun HomeScreen(
     val todayCheckIn by viewModel.todayCheckIn.collectAsState()
     val unlockedBadges by viewModel.unlockedBadges.collectAsState()
     val currentWisdom by viewModel.currentWisdom.collectAsState()
+
+    val serverAudios by viewModel.serverAudios.collectAsState()
+    val serverVideos by viewModel.serverVideos.collectAsState()
+    val serverImages by viewModel.serverImages.collectAsState()
+    val serverNotifications by viewModel.serverNotifications.collectAsState()
+    val unreadNotifications by viewModel.unreadNotificationCount.collectAsState()
 
     val activeSound by viewModel.audioEngine.activeSoundType.collectAsState()
     val isSoundPlaying by viewModel.audioEngine.isPlaying.collectAsState()
@@ -261,6 +268,119 @@ fun HomeScreen(
                             textAlign = TextAlign.End,
                             modifier = Modifier.fillMaxWidth()
                         )
+                    }
+                }
+            }
+
+            // 2.5. Online Media & Announcements Card (Server Data)
+            item {
+                ElevatedCard(
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.elevatedCardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(18.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Surface(
+                                    color = TealPrimary.copy(alpha = 0.15f),
+                                    shape = CircleShape,
+                                    modifier = Modifier.size(40.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(text = "☁️", fontSize = 20.sp)
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        text = "رسانه و پیام‌های آنلاین آرامش",
+                                        fontFamily = LalezarFont,
+                                        fontSize = 18.sp,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "صوت‌ها، ویدیوها، عکس‌ها و اعلان‌های سرور",
+                                        fontFamily = VazirFont,
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            if (unreadNotifications > 0) {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.error,
+                                    shape = CircleShape
+                                ) {
+                                    Text(
+                                        text = "${JalaaliCalendarHelper.toPersianNumber(unreadNotifications)} جدید",
+                                        fontFamily = VazirFont,
+                                        fontSize = 10.sp,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Category count chips
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            OnlineMediaChip(
+                                title = "صوت‌ها",
+                                icon = "🎧",
+                                count = serverAudios.size,
+                                onClick = onNavigateToServerMedia
+                            )
+                            OnlineMediaChip(
+                                title = "ویدیوها",
+                                icon = "🎬",
+                                count = serverVideos.size,
+                                onClick = onNavigateToServerMedia
+                            )
+                            OnlineMediaChip(
+                                title = "عکس‌ها",
+                                icon = "🖼️",
+                                count = serverImages.size,
+                                onClick = onNavigateToServerMedia
+                            )
+                            OnlineMediaChip(
+                                title = "اعلان‌ها",
+                                icon = "🔔",
+                                count = serverNotifications.size,
+                                onClick = onNavigateToServerMedia
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Button(
+                            onClick = onNavigateToServerMedia,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = TealPrimary),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(
+                                text = "ورود به مرکز رسانه‌ها و اعلان‌ها",
+                                fontFamily = VazirFont,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }
@@ -741,3 +861,47 @@ fun QuickOptionCard(
         }
     }
 }
+
+@Composable
+fun OnlineMediaChip(
+    title: String,
+    icon: String,
+    count: Int,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+        tonalElevation = 1.dp
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
+        ) {
+            Text(text = icon, fontSize = 20.sp)
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = title,
+                fontFamily = VazirFont,
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Surface(
+                color = TealPrimary.copy(alpha = 0.15f),
+                shape = CircleShape
+            ) {
+                Text(
+                    text = JalaaliCalendarHelper.toPersianNumber(count),
+                    fontFamily = VazirFont,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TealPrimary,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
+                )
+            }
+        }
+    }
+}
+

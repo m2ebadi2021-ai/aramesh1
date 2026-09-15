@@ -19,6 +19,7 @@ import com.example.data.local.entity.MindfulnessEntity
 import com.example.data.local.entity.SelfKnowItemEntity
 import com.example.data.local.entity.SelfKnowQuestionEntity
 import com.example.data.local.entity.SelfLoveEntity
+import com.example.data.local.entity.ServerMediaEntity
 
 @Database(
     entities = [
@@ -35,9 +36,10 @@ import com.example.data.local.entity.SelfLoveEntity
         EsteemItemEntity::class,
         EsteemLogEntity::class,
         JournalEntity::class,
-        BadgeEntity::class
+        BadgeEntity::class,
+        ServerMediaEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class ArameshDatabase : RoomDatabase() {

@@ -15,9 +15,14 @@ import com.example.data.local.entity.MindfulnessEntity
 import com.example.data.local.entity.SelfKnowItemEntity
 import com.example.data.local.entity.SelfKnowQuestionEntity
 import com.example.data.local.entity.SelfLoveEntity
+import com.example.data.local.entity.ServerMediaEntity
+import com.example.data.remote.NetworkClient
+import com.example.data.remote.dto.MediaItemDto
 import com.example.domain.model.BadgeCatalog
 import com.example.domain.model.GratitudeTreeState
 import com.example.domain.model.JalaaliCalendarHelper
+import com.example.domain.model.ServerMediaItem
+import com.example.domain.model.ServerMediaType
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -326,4 +331,93 @@ class ArameshRepository(private val dao: ArameshDao) {
 
         return newlyUnlocked
     }
+
+    // --- SERVER MEDIA & NOTIFICATIONS ---
+    val allServerMedia: Flow<List<ServerMediaItem>> = dao.getAllServerMedia().map { list ->
+        list.map { it.toDomain() }
+    }
+
+    val serverAudios: Flow<List<ServerMediaItem>> = dao.getServerMediaByType("audio").map { list ->
+        list.map { it.toDomain() }
+    }
+
+    val serverImages: Flow<List<ServerMediaItem>> = dao.getServerMediaByType("image").map { list ->
+        list.map { it.toDomain() }
+    }
+
+    val serverVideos: Flow<List<ServerMediaItem>> = dao.getServerMediaByType("video").map { list ->
+        list.map { it.toDomain() }
+    }
+
+    val serverNotifications: Flow<List<ServerMediaItem>> = dao.getServerMediaByType("notification").map { list ->
+        list.map { it.toDomain() }
+    }
+
+    val unreadNotificationCount: Flow<Int> = dao.getUnreadNotificationCount()
+
+    suspend fun syncServerMedia(type: String? = null): Result<List<ServerMediaItem>> {
+        return try {
+            val response = NetworkClient.apiService.getMediaItems(
+                api = 1,
+                token = NetworkClient.API_TOKEN,
+                type = type
+            )
+            if (response.ok) {
+                val entities = response.data.map { dto ->
+                    dto.toEntity()
+                }
+                if (type == null) {
+                    dao.clearAllServerMedia()
+                    dao.insertServerMediaItems(entities)
+                } else {
+                    dao.deleteServerMediaByType(type.lowercase().trim())
+                    dao.insertServerMediaItems(entities)
+                }
+                Result.success(entities.map { it.toDomain() })
+            } else {
+                Result.failure(Exception(response.error ?: "خطا در دریافت اطلاعات از سرور"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun markMediaAsRead(id: Long) {
+        dao.markMediaAsRead(id)
+    }
+}
+
+private fun MediaItemDto.toEntity(): ServerMediaEntity {
+    return ServerMediaEntity(
+        id = id,
+        title = title,
+        description = description,
+        url = url,
+        image = image,
+        duration = duration,
+        category = category,
+        type = type.lowercase().trim(),
+        sortOrder = sortOrder,
+        updatedAt = updatedAt,
+        fullMediaUrl = NetworkClient.resolveUrl(url),
+        fullImageUrl = NetworkClient.resolveUrl(image)
+    )
+}
+
+private fun ServerMediaEntity.toDomain(): ServerMediaItem {
+    return ServerMediaItem(
+        id = id,
+        title = title,
+        description = description ?: "",
+        rawUrl = url,
+        rawImage = image,
+        fullMediaUrl = fullMediaUrl,
+        fullImageUrl = fullImageUrl,
+        durationSeconds = duration,
+        category = category ?: "عمومی",
+        type = ServerMediaType.fromRaw(type),
+        sortOrder = sortOrder,
+        updatedAt = updatedAt ?: "",
+        isRead = isRead
+    )
 }
