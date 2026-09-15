@@ -1,0 +1,6 @@
+{
+  "name": "Aramesh Mindfulness",
+  "description": "Offline-first mindfulness, gratitude journaling, habit tracking, and personal growth app with gratitude tree, breathing exercises, and ambient sounds.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
